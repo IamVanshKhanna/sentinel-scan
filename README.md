@@ -11,9 +11,13 @@
 ## Table of Contents
 
 - [What It Does](#what-it-does)
+- [How It Works](#how-it-works)
 - [Quick Start](#quick-start)
 - [Usage](#usage)
+- [What to Expect](#what-to-expect)
+- [Pros and Cons](#pros-and-cons)
 - [How Detection Works](#how-detection-works)
+- [Known Limitations](#known-limitations)
 - [Repository Structure](#repository-structure)
 - [Skills This Project Shows](#skills-this-project-shows)
 - [License](#license)
@@ -27,6 +31,20 @@
 3. **Scored report** — every finding gets a severity (critical/high/medium/low); a total risk score is computed from the weighted sum.
 
 Built to understand the technique, not to replace gitleaks or truffleHog — those are maintained, team-backed tools with curated ruleset libraries and (in truffleHog's case) live credential verification this doesn't attempt. This is a small, from-scratch implementation of the same core idea (regex + entropy detection, dependency CVE lookup) applied to my own repos before they went public, kept intentionally readable end to end.
+
+---
+
+## How It Works
+
+Point it at a directory and it runs a fixed pipeline:
+
+1. **Walk the tree.** Skips `.git`, `node_modules`, `venv`, build output, and lockfiles (`package-lock.json` etc. — full of legitimate high-entropy hashes, pure noise for secret detection). Binary files are sniffed (null-byte check) and skipped for content scanning, but a binary `.pem`/`.key`/`id_rsa` is still flagged by filename alone. Files over 5MB are skipped outright.
+2. **Scan each remaining file, line by line.** ~15 regex patterns catch specific credential shapes (AWS keys, GitHub/Slack/Stripe tokens, JWTs, DB connection strings, private key headers). A Shannon-entropy check on quoted strings catches high-randomness values the named patterns miss — but only where a named pattern hasn't already matched that exact span, so one real secret isn't double-counted as two findings.
+3. **Respect suppression rules**, and say so. A `.sentinelignore` file (glob patterns), `--exclude PATTERN` flags, and inline `# sentinel-scan:ignore` comments all suppress findings — but the *count* of what got suppressed is always printed, so a broad ignore rule can't silently blind the scan without leaving a trace in the output.
+4. **Check dependencies, if any exist.** Parses `requirements.txt`/`package.json`, sends everything found to [OSV.dev](https://osv.dev) in one batched query (no API key, real live CVE data). If that network call fails, the report says so explicitly — an empty result and a *failed* result are never rendered identically, because a security tool silently reporting "clean" when it never actually checked is the wrong default.
+5. **Optionally walk git history** (`--history`) — the same regex set runs against every added line (`git log -p`) across up to `--max-commits` commits, catching a secret that was committed then "removed" in a later commit but is still sitting in every clone's history.
+6. **Score and render.** Every finding gets a severity; a weighted total (critical=10, high=6, medium=3, low=1) becomes the headline risk score. Output is a Rich-formatted table by default, or `--json`/`--markdown` for piping into something else.
+7. **Optionally gate on severity.** `--fail-on critical` (or high/medium/low) exits 1 if a finding at or above that severity exists — the hook for wiring this into CI.
 
 ---
 
@@ -49,6 +67,67 @@ sentinel-scan /path/to/repo --markdown      # for a PR comment or report
 sentinel-scan /path/to/repo --no-deps       # secrets only, skip network call
 sentinel-scan /path/to/repo --fail-on high  # exit 1 if a high/critical finding exists — CI-friendly
 ```
+
+---
+
+## What to Expect
+
+A clean repo prints exactly this — no noise, no "probably fine, we didn't really check":
+
+```
+sentinel-scan — /path/to/repo
+Risk score: 0  (0 secret findings, 0 vulnerable dependencies, 0 in git history)
+
+No findings.
+```
+
+A repo with a real finding looks like this (illustrative example — not a live credential):
+
+```
+sentinel-scan — /path/to/repo
+Risk score: 13  (2 secret findings, 1 vulnerable dependencies, 0 in git history)
+
+                                    Secrets
+┏━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Severity ┃ File        ┃ Line ┃ Kind                   ┃ Snippet                 ┃
+┡━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ CRITICAL │ config.py   │ 12   │ aws_access_key         │ AWS_KEY = "AKIA..."    │
+│ MEDIUM   │ app.py      │ 40   │ generic_secret_assign… │ api_key = "..."         │
+└──────────┴─────────────┴──────┴────────────────────────┴─────────────────────────┘
+
+                              Vulnerable Dependencies
+┏━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Severity ┃ Package  ┃ Version ┃ Vuln ID         ┃ Summary                     ┃
+┡━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ HIGH     │ requests │ 2.6.0   │ GHSA-xxxx-xxxx  │ ...                          │
+└──────────┴──────────┴─────────┴─────────────────┴──────────────────────────────┘
+```
+
+If a `.sentinelignore` or `--exclude` rule suppressed anything, or the dependency/history check failed to complete, that's printed too — always visible, never folded silently into "0 findings":
+
+```
+2 file(s) skipped by .sentinelignore / --exclude rules.
+1 line(s) suppressed by inline 'sentinel-scan:ignore' markers.
+WARNING: dependency vulnerability check failed (network/API error) — results are INCOMPLETE, not verified clean.
+```
+
+`--fail-on critical` (or high/medium/low) turns any of the above into a non-zero exit code — that's the whole CI integration story, no extra flags needed beyond picking a threshold.
+
+---
+
+## Pros and Cons
+
+**Pros**
+- Zero setup cost for the dependency check — OSV.dev needs no account, no API key, no rate-limit dance.
+- A failed check is never disguised as a clean result — dependency, history, and suppression state are all explicitly surfaced, not silently folded into "0 findings."
+- Small enough to read end to end in one sitting — each concern (detection, scoring, reporting, CLI) is its own ~100-line file, not a framework.
+- Runs anywhere Python 3.10+ or Docker runs — no service to stand up, no account to create.
+- CI-ready out of the box: `--fail-on` + a real exit code, `--json`/`--markdown` for piping into a dashboard or PR comment.
+
+**Cons** — see [Known Limitations](#known-limitations) for the full, honest list, but the short version:
+- Regex + entropy detection has a real, structural ceiling — obfuscated or split secrets aren't caught, by this or any tool in the same category.
+- Not corpus-calibrated. The entropy threshold and pattern list are reasoned about, not tuned against years of real-world false-positive data the way gitleaks/truffleHog's are.
+- `--history` only sees the current branch's linear commit log — squash-merged-away branch history isn't covered.
 
 ---
 

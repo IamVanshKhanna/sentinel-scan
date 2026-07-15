@@ -1,0 +1,29 @@
+[project]
+name = "sentinel-scan"
+version = "0.1.0"
+description = "Scan a repository for hardcoded secrets and known-vulnerable dependencies."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Vansh Khanna" }]
+dependencies = [
+    "requests>=2.31",
+    "rich>=13.0",
+]
+
+[project.scripts]
+sentinel-scan = "sentinel_scan.cli:main"
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "ruff>=0.5", "responses>=0.25"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["sentinel_scan*"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"

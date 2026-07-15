@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import fnmatch
 import math
+import os
 import re
 from dataclasses import dataclass
 
@@ -15,6 +17,17 @@ SKIP_FILES = {
     "Cargo.lock", "Gemfile.lock", "composer.lock",
 }
 
+INLINE_IGNORE_MARKER = "sentinel-scan:ignore"
+
+# Filenames that are inherently secret-shaped regardless of content — key material
+# files, not just key-material-looking lines.
+SECRET_FILENAME_PATTERNS = [
+    (re.compile(r".*\.pem$"), "pem_key_file", "critical"),
+    (re.compile(r".*\.key$"), "key_file", "critical"),
+    (re.compile(r"^id_rsa$|^id_dsa$|^id_ecdsa$|^id_ed25519$"), "ssh_private_key_file", "critical"),
+    (re.compile(r"^\.npmrc$"), "npmrc_file", "medium"),
+]
+
 # High-confidence, low-false-positive patterns first — these alone are strong signal.
 PATTERNS: list[tuple[str, str, str]] = [
     ("aws_access_key", r"AKIA[0-9A-Z]{16}", "critical"),
@@ -23,8 +36,16 @@ PATTERNS: list[tuple[str, str, str]] = [
     ("github_fine_grained", r"github_pat_[A-Za-z0-9_]{22,}", "critical"),
     ("private_key_header", r"-----BEGIN (RSA |EC |OPENSSH |DSA |)PRIVATE KEY-----", "critical"),
     ("slack_token", r"xox[baprs]-[A-Za-z0-9-]{10,}", "high"),
+    ("slack_webhook", r"https://hooks\.slack\.com/services/T[A-Za-z0-9]+/B[A-Za-z0-9]+/[A-Za-z0-9]+", "high"),
+    ("stripe_live_key", r"[sr]k_live_[A-Za-z0-9]{20,}", "critical"),
+    ("stripe_test_key", r"[sr]k_test_[A-Za-z0-9]{20,}", "medium"),
+    ("jwt_token", r"eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+", "high"),
+    ("db_connection_string_with_creds",
+     r"(?i)(postgres|postgresql|mysql|mongodb(\+srv)?)://[^:\s]+:[^@\s]+@[^/\s]+", "critical"),
+    # Excludes values starting with $ or {{ — those are variable references / template
+    # placeholders (${VAR}, $VAR, {{ jinja }}), not literal hardcoded secrets.
     ("generic_secret_assignment",
-     r"(?i)(api[_-]?key|secret|token|password|passwd|pwd)\s*[:=]\s*['\"][^'\"\s]{8,}['\"]",
+     r"(?i)(api[_-]?key|secret|token|password|passwd|pwd)\s*[:=]\s*['\"](?!\$|\{\{)[^'\"\s]{8,}['\"]",
      "medium"),
 ]
 
@@ -54,8 +75,40 @@ QUOTED_STRING = re.compile(r"""['"]([A-Za-z0-9+/=_\-]{20,})['"]""")
 ENTROPY_THRESHOLD = 4.3  # empirically: random base64/hex secrets sit well above this; words/paths sit below
 
 
-def scan_file(path: str) -> list[Finding]:
+def load_ignore_patterns(root: str) -> list[str]:
+    """Read .sentinelignore from the scan root — one glob pattern per line, '#' comments allowed."""
+    ignore_path = os.path.join(root, ".sentinelignore")
+    patterns: list[str] = []
+    try:
+        with open(ignore_path, encoding="utf-8") as f:
+            for line in f:
+                line = line.split("#", 1)[0].strip()
+                if line:
+                    patterns.append(line)
+    except OSError:
+        pass
+    return patterns
+
+
+def is_ignored(path: str, root: str, ignore_patterns: list[str]) -> bool:
+    rel_path = os.path.relpath(path, root)
+    return any(fnmatch.fnmatch(rel_path, pat) or fnmatch.fnmatch(os.path.basename(path), pat)
+               for pat in ignore_patterns)
+
+
+def check_filename(path: str) -> list[Finding]:
     findings: list[Finding] = []
+    basename = os.path.basename(path)
+    for pattern, kind, severity in SECRET_FILENAME_PATTERNS:
+        if pattern.match(basename):
+            findings.append(Finding(file=path, line=0, kind=kind, severity=severity,
+                                     snippet=f"(flagged by filename: {basename})"))
+    return findings
+
+
+def scan_file(path: str) -> list[Finding]:
+    findings: list[Finding] = check_filename(path)
+
     try:
         with open(path, encoding="utf-8", errors="ignore") as f:
             lines = f.readlines()
@@ -63,6 +116,9 @@ def scan_file(path: str) -> list[Finding]:
         return findings
 
     for lineno, line in enumerate(lines, start=1):
+        if INLINE_IGNORE_MARKER in line:
+            continue
+
         for name, pattern, severity in COMPILED:
             if pattern.search(line):
                 findings.append(Finding(file=path, line=lineno, kind=name, severity=severity,
@@ -80,8 +136,7 @@ def scan_file(path: str) -> list[Finding]:
 
 
 def scan_directory(root: str) -> list[Finding]:
-    import os
-
+    ignore_patterns = load_ignore_patterns(root)
     findings: list[Finding] = []
     for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
@@ -90,5 +145,8 @@ def scan_directory(root: str) -> list[Finding]:
                 continue
             if filename.endswith((".png", ".jpg", ".jpeg", ".gif", ".ico", ".woff", ".woff2", ".ttf")):
                 continue
-            findings.extend(scan_file(os.path.join(dirpath, filename)))
+            full_path = os.path.join(dirpath, filename)
+            if is_ignored(full_path, root, ignore_patterns):
+                continue
+            findings.extend(scan_file(full_path))
     return findings

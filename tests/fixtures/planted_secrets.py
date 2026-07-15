@@ -18,3 +18,12 @@ api_key = "not_a_real_secret_but_looks_like_one"
 FAKE_PRIVATE_KEY = """-----BEGIN RSA PRIVATE KEY-----
 FAKEKEYDATAFAKEKEYDATAFAKEKEYDATAFAKEKEYDATA
 -----END RSA PRIVATE KEY-----"""
+
+# fake Stripe live key (correct format, not live)
+STRIPE_KEY = "sk_live_FAKEFAKEFAKEFAKEFAKEFAKE"
+
+# fake JWT (correct structural shape, not a real signed token)
+JWT = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJmYWtlIn0.fake_signature_not_real"
+
+# fake DB connection string with embedded credentials
+DB_URL = "postgres://fakeuser:fakepassword@db.example.com:5432/mydb"

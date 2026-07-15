@@ -41,3 +41,47 @@ def test_lockfiles_are_skipped_not_flagged():
     findings = scan_directory(FIXTURES)
     lockfile_findings = [f for f in findings if f.file.endswith("package-lock.json")]
     assert lockfile_findings == []
+
+
+def test_sentinelignore_suppresses_listed_file():
+    findings = scan_directory(os.path.join(FIXTURES, "ignore-test"))
+    ignored = [f for f in findings if "ignored_secret.py" in f.file]
+    assert ignored == []
+
+
+def test_inline_ignore_marker_suppresses_line():
+    findings = scan_directory(os.path.join(FIXTURES, "ignore-test"))
+    inline = [f for f in findings if "inline_ignore.py" in f.file]
+    assert inline == []
+
+
+def test_stripe_key_detected():
+    findings = scan_file(os.path.join(FIXTURES, "planted_secrets.py"))
+    kinds = {f.kind for f in findings}
+    assert "stripe_live_key" in kinds
+
+
+def test_jwt_detected():
+    findings = scan_file(os.path.join(FIXTURES, "planted_secrets.py"))
+    kinds = {f.kind for f in findings}
+    assert "jwt_token" in kinds
+
+
+def test_db_connection_string_detected():
+    findings = scan_file(os.path.join(FIXTURES, "planted_secrets.py"))
+    kinds = {f.kind for f in findings}
+    assert "db_connection_string_with_creds" in kinds
+
+
+def test_pem_file_flagged_by_filename():
+    findings = scan_file(os.path.join(FIXTURES, "fake.pem"))
+    kinds = {f.kind for f in findings}
+    assert "pem_key_file" in kinds
+
+
+def test_shell_env_var_reference_not_flagged(tmp_path):
+    """TOKEN="${TELEGRAM_BOT_TOKEN:-}" is a bash default-value pattern, not a literal secret."""
+    f = tmp_path / "script.sh"
+    f.write_text('TELEGRAM_BOT_TOKEN="${TELEGRAM_BOT_TOKEN:-}"\n')
+    findings = scan_file(str(f))
+    assert findings == []

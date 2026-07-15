@@ -28,6 +28,13 @@ class HistoryFinding:
     snippet: str
 
 
+@dataclass
+class HistoryScanResult:
+    findings: list[HistoryFinding]
+    ok: bool  # False means the git command itself failed — distinct from "not a git repo"
+    #           (which is a valid no-op, ok=True) and from "ran clean, found nothing".
+
+
 def is_git_repo(path: str) -> bool:
     result = subprocess.run(
         ["git", "-C", path, "rev-parse", "--is-inside-work-tree"],
@@ -36,10 +43,16 @@ def is_git_repo(path: str) -> bool:
     return result.returncode == 0 and result.stdout.strip() == "true"
 
 
-def scan_history(path: str, max_commits: int = 500) -> list[HistoryFinding]:
-    """Scan up to max_commits of history. Fails soft (empty list) if not a git repo or git errors."""
+def scan_history(path: str, max_commits: int = 500) -> HistoryScanResult:
+    """Scan up to max_commits of history.
+
+    Not being a git repo is a valid no-op (ok=True, empty findings) — most scan targets
+    won't be repos and --history shouldn't look like a failure for that. An actual git
+    command error (timeout, non-zero exit, OSError) sets ok=False so callers can tell
+    "history scan never really ran" apart from "ran clean, nothing found in history".
+    """
     if not is_git_repo(path):
-        return []
+        return HistoryScanResult(findings=[], ok=True)
 
     try:
         result = subprocess.run(
@@ -47,10 +60,10 @@ def scan_history(path: str, max_commits: int = 500) -> list[HistoryFinding]:
             capture_output=True, text=True, timeout=60,
         )
     except (subprocess.TimeoutExpired, OSError):
-        return []
+        return HistoryScanResult(findings=[], ok=False)
 
     if result.returncode != 0:
-        return []
+        return HistoryScanResult(findings=[], ok=False)
 
     findings: list[HistoryFinding] = []
     current_commit = "unknown"
@@ -79,4 +92,4 @@ def scan_history(path: str, max_commits: int = 500) -> list[HistoryFinding]:
                     severity=severity, snippet=content.strip()[:120],
                 ))
 
-    return findings
+    return HistoryScanResult(findings=findings, ok=True)

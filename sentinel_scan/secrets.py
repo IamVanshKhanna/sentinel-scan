@@ -171,9 +171,17 @@ def scan_file(path: str) -> list[Finding]:
     return findings
 
 
-def scan_directory(root: str, extra_ignore_patterns: list[str] | None = None) -> list[Finding]:
+@dataclass
+class DirectoryScanResult:
+    findings: list[Finding]
+    ignored_file_count: int  # files skipped due to .sentinelignore / --exclude — surfaced so
+    #                          an ignore rule silently blinding the scan is visible, not silent.
+
+
+def scan_directory_with_stats(root: str, extra_ignore_patterns: list[str] | None = None) -> DirectoryScanResult:
     ignore_patterns = load_ignore_patterns(root) + (extra_ignore_patterns or [])
     findings: list[Finding] = []
+    ignored_file_count = 0
     for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
         for filename in filenames:
@@ -183,6 +191,14 @@ def scan_directory(root: str, extra_ignore_patterns: list[str] | None = None) ->
                 continue
             full_path = os.path.join(dirpath, filename)
             if is_ignored(full_path, root, ignore_patterns):
+                ignored_file_count += 1
                 continue
             findings.extend(scan_file(full_path))
-    return findings
+    return DirectoryScanResult(findings=findings, ignored_file_count=ignored_file_count)
+
+
+def scan_directory(root: str, extra_ignore_patterns: list[str] | None = None) -> list[Finding]:
+    """Convenience wrapper over scan_directory_with_stats() for callers that only need the
+    findings list (existing tests, simple scripting use). CLI uses the stats version directly
+    to surface how many files an ignore rule suppressed."""
+    return scan_directory_with_stats(root, extra_ignore_patterns).findings

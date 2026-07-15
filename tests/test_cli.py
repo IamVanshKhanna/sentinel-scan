@@ -44,3 +44,23 @@ def test_fail_on_returns_zero_when_clean(tmp_path):
 
     exit_code = main([str(tmp_path), "--no-deps", "--fail-on", "critical"])
     assert exit_code == 0
+
+
+def test_ignored_file_count_surfaced_on_stderr(tmp_path, capsys):
+    """A .sentinelignore or --exclude rule that suppresses files must be visible in output —
+    otherwise an ignore rule can silently blind the whole scan with no trace in the report."""
+    secret_file = tmp_path / "secret.py"
+    secret_file.write_text('AWS_ACCESS_KEY = "AKIAABCDEFGHIJKLMNOP"\n')
+
+    main([str(tmp_path), "--no-deps", "--exclude", "secret.py"])
+    err = capsys.readouterr().err
+    assert "1 file(s) skipped" in err
+
+
+def test_no_ignored_file_message_when_nothing_excluded(tmp_path, capsys):
+    clean_file = tmp_path / "clean.py"
+    clean_file.write_text("x = 1\n")
+
+    main([str(tmp_path), "--no-deps"])
+    err = capsys.readouterr().err
+    assert "skipped" not in err

@@ -23,7 +23,7 @@ def _deps_status_line(vuln_findings: list, deps_check_ok: bool) -> str:
 def render_table(secret_findings: list, vuln_findings: list, target: str,
                   history_findings: list | None = None, deps_check_ok: bool = True) -> None:
     history_findings = history_findings or []
-    score = risk_score(secret_findings, vuln_findings)
+    score = risk_score(secret_findings, vuln_findings, history_findings)
     deps_status = _deps_status_line(vuln_findings, deps_check_ok)
 
     if _HAS_RICH:
@@ -90,7 +90,7 @@ def render_json(secret_findings: list, vuln_findings: list, target: str,
     history_findings = history_findings or []
     return json.dumps({
         "target": target,
-        "risk_score": risk_score(secret_findings, vuln_findings),
+        "risk_score": risk_score(secret_findings, vuln_findings, history_findings),
         "secrets": [f.__dict__ for f in secret_findings],
         "vulnerable_dependencies": [v.__dict__ for v in vuln_findings],
         "dependency_check_ok": deps_check_ok,
@@ -101,7 +101,7 @@ def render_json(secret_findings: list, vuln_findings: list, target: str,
 def render_markdown(secret_findings: list, vuln_findings: list, target: str,
                      history_findings: list | None = None, deps_check_ok: bool = True) -> str:
     history_findings = history_findings or []
-    score = risk_score(secret_findings, vuln_findings)
+    score = risk_score(secret_findings, vuln_findings, history_findings)
     lines = [f"# sentinel-scan report — `{target}`", "", f"**Risk score:** {score}", ""]
 
     lines.append("## Secrets")

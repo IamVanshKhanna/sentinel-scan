@@ -81,6 +81,12 @@ class OsvQueryResult:
     ok: bool  # False means the query failed — "no findings" is NOT the same as "verified clean"
 
 
+def compute_timeout(dep_count: int) -> float:
+    """Timeout budget scaled to batch size — a fixed 15s window is guaranteed to fail on a
+    large monorepo lockfile regardless of network health, which would misreport as 'clean'."""
+    return max(15.0, dep_count * 0.25)
+
+
 def query_osv(deps: list[Dependency], timeout: float | None = None) -> OsvQueryResult:
     """Batch-query OSV.dev for known vulnerabilities.
 
@@ -97,9 +103,7 @@ def query_osv(deps: list[Dependency], timeout: float | None = None) -> OsvQueryR
         for d in deps
     ]
 
-    # Scale timeout with batch size — a fixed 15s budget is guaranteed to fail on a large
-    # monorepo lockfile regardless of network health, which would misreport as "clean".
-    effective_timeout = timeout if timeout is not None else max(15.0, len(deps) * 0.25)
+    effective_timeout = timeout if timeout is not None else compute_timeout(len(deps))
 
     try:
         resp = requests.post(OSV_BATCH_URL, json={"queries": queries}, timeout=effective_timeout)

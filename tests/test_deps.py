@@ -4,6 +4,7 @@ import responses
 
 from sentinel_scan.deps import (
     Dependency,
+    compute_timeout,
     find_manifests,
     parse_requirements_txt,
     query_osv,
@@ -74,20 +75,14 @@ def test_query_osv_empty_input_returns_ok_empty():
     assert result.findings == []
 
 
-@responses.activate
-def test_query_osv_timeout_scales_with_batch_size():
-    """A fixed 15s timeout would deterministically fail on a large dependency batch —
-    the effective timeout should grow with how many packages are being queried."""
-    deps = [
-        Dependency(name=f"pkg{i}", version="1.0.0", ecosystem="PyPI", manifest="requirements.txt")
-        for i in range(200)
-    ]
-    responses.add(responses.POST, "https://api.osv.dev/v1/querybatch", json={"results": [{}] * 200}, status=200)
+def test_compute_timeout_has_a_floor_for_small_batches():
+    assert compute_timeout(0) == 15.0
+    assert compute_timeout(1) == 15.0
+    assert compute_timeout(10) == 15.0
 
-    result = query_osv(deps)
-    assert result.ok is True
-    call_kwargs = responses.calls[0].request
-    # We can't directly introspect the timeout passed to requests from the recorded call,
-    # so this test exercises the large-batch path end-to-end and asserts it still succeeds
-    # rather than asserting on internal timeout arithmetic.
-    assert call_kwargs is not None
+
+def test_compute_timeout_scales_up_for_large_batches():
+    """A fixed 15s timeout would deterministically fail on a large dependency batch —
+    the effective timeout must grow with how many packages are being queried."""
+    assert compute_timeout(200) == 50.0
+    assert compute_timeout(1000) > compute_timeout(200)

@@ -36,11 +36,34 @@ def test_is_git_repo_false_for_non_repo(tmp_path):
 
 
 def test_history_finds_secret_removed_from_head(repo_with_removed_secret):
-    findings = scan_history(str(repo_with_removed_secret))
-    assert len(findings) == 1
-    assert findings[0].kind == "aws_access_key"
-    assert findings[0].file == "config.py"
+    result = scan_history(str(repo_with_removed_secret))
+    assert result.ok is True
+    assert len(result.findings) == 1
+    assert result.findings[0].kind == "aws_access_key"
+    assert result.findings[0].file == "config.py"
 
 
-def test_history_scan_on_non_repo_fails_soft(tmp_path):
-    assert scan_history(str(tmp_path)) == []
+def test_history_scan_on_non_repo_is_a_valid_noop_not_a_failure(tmp_path):
+    """Not being a git repo is expected and common — it must report ok=True, not look
+    like the history scan crashed."""
+    result = scan_history(str(tmp_path))
+    assert result.ok is True
+    assert result.findings == []
+
+
+def test_history_scan_reports_not_ok_on_git_command_failure(tmp_path, monkeypatch):
+    """An actual git command failure (as opposed to 'not a repo') must be distinguishable
+    from a clean scan — same fail-open concern already fixed for the OSV dependency check."""
+    import subprocess as sp
+
+    from sentinel_scan import history as history_module
+
+    monkeypatch.setattr(history_module, "is_git_repo", lambda path: True)
+
+    def fake_run(*args, **kwargs):
+        raise sp.TimeoutExpired(cmd="git log -p", timeout=60)
+
+    monkeypatch.setattr(sp, "run", fake_run)
+    result = scan_history(str(tmp_path))
+    assert result.ok is False
+    assert result.findings == []

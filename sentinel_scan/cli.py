@@ -31,7 +31,8 @@ def main(argv: list[str] | None = None) -> int:
                          default="none", help="Exit non-zero if a finding at or above this severity exists")
     args = parser.parse_args(argv)
 
-    secret_findings = secrets.scan_directory(args.path, extra_ignore_patterns=args.exclude)
+    secret_scan = secrets.scan_directory_with_stats(args.path, extra_ignore_patterns=args.exclude)
+    secret_findings = secret_scan.findings
 
     vuln_findings = []
     deps_check_ok = True
@@ -42,8 +43,11 @@ def main(argv: list[str] | None = None) -> int:
         deps_check_ok = osv_result.ok
 
     history_findings = []
+    history_check_ok = True
     if args.history:
-        history_findings = history.scan_history(args.path, max_commits=args.max_commits)
+        history_result = history.scan_history(args.path, max_commits=args.max_commits)
+        history_findings = history_result.findings
+        history_check_ok = history_result.ok
 
     if args.json:
         print(report.render_json(secret_findings, vuln_findings, args.path, history_findings, deps_check_ok))
@@ -52,9 +56,15 @@ def main(argv: list[str] | None = None) -> int:
     else:
         report.render_table(secret_findings, vuln_findings, args.path, history_findings, deps_check_ok)
 
+    if secret_scan.ignored_file_count > 0:
+        print(f"\n{secret_scan.ignored_file_count} file(s) skipped by .sentinelignore / --exclude rules.",
+              file=sys.stderr)
     if not deps_check_ok:
-        print("\nWARNING: dependency vulnerability check failed (network/API error) — "
+        print("WARNING: dependency vulnerability check failed (network/API error) — "
               "results are INCOMPLETE, not verified clean.", file=sys.stderr)
+    if args.history and not history_check_ok:
+        print("WARNING: git history scan failed (git command error/timeout) — "
+              "history results are INCOMPLETE, not verified clean.", file=sys.stderr)
 
     if args.fail_on != "none":
         threshold = FAIL_ON_THRESHOLD[args.fail_on]

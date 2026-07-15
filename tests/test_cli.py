@@ -64,3 +64,21 @@ def test_no_ignored_file_message_when_nothing_excluded(tmp_path, capsys):
     main([str(tmp_path), "--no-deps"])
     err = capsys.readouterr().err
     assert "skipped" not in err
+
+
+def test_inline_suppressed_count_surfaced_on_stderr(tmp_path, capsys):
+    secret_file = tmp_path / "secret.py"
+    secret_file.write_text('AWS_ACCESS_KEY = "AKIAABCDEFGHIJKLMNOP"  # sentinel-scan:ignore\n')
+
+    main([str(tmp_path), "--no-deps"])
+    err = capsys.readouterr().err
+    assert "1 line(s) suppressed by inline" in err
+
+
+def test_json_output_includes_schema_version(tmp_path, capsys):
+    clean_file = tmp_path / "clean.py"
+    clean_file.write_text("x = 1\n")
+
+    main([str(tmp_path), "--no-deps", "--json"])
+    out = capsys.readouterr().out
+    assert '"schema_version": 1' in out

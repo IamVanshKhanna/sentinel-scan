@@ -124,27 +124,37 @@ def check_filename(path: str) -> list[Finding]:
 
 
 def scan_file(path: str) -> list[Finding]:
+    """Convenience wrapper — see _scan_file_with_stats() for the suppression count."""
+    return _scan_file_with_stats(path)[0]
+
+
+def _scan_file_with_stats(path: str) -> tuple[list[Finding], int]:
+    """Returns (findings, inline_suppressed_count). The count exists so a line marked with
+    the inline-ignore comment isn't a fully silent suppression — the same visibility
+    principle already applied to .sentinelignore/--exclude at the file level."""
     # Filename-based detection runs regardless of binary/size status — a binary .pem or
     # .key file is still exactly the kind of thing this check exists to catch.
     findings: list[Finding] = check_filename(path)
+    inline_suppressed = 0
 
     try:
         if os.path.getsize(path) > MAX_FILE_SIZE_BYTES:
-            return findings
+            return findings, inline_suppressed
     except OSError:
-        return findings
+        return findings, inline_suppressed
 
     if is_binary(path):
-        return findings
+        return findings, inline_suppressed
 
     try:
         with open(path, encoding="utf-8", errors="ignore") as f:
             lines = f.readlines()
     except (OSError, UnicodeDecodeError):
-        return findings
+        return findings, inline_suppressed
 
     for lineno, line in enumerate(lines, start=1):
         if INLINE_IGNORE_MARKER in line:
+            inline_suppressed += 1
             continue
 
         regex_spans: list[tuple[int, int]] = []
@@ -168,20 +178,24 @@ def scan_file(path: str) -> list[Finding]:
                     findings.append(Finding(file=path, line=lineno, kind="high_entropy_string",
                                              severity="low", snippet=line.strip()[:120]))
 
-    return findings
+    return findings, inline_suppressed
 
 
 @dataclass
 class DirectoryScanResult:
     findings: list[Finding]
-    ignored_file_count: int  # files skipped due to .sentinelignore / --exclude — surfaced so
-    #                          an ignore rule silently blinding the scan is visible, not silent.
+    ignored_file_count: int  # files skipped due to .sentinelignore / --exclude
+    inline_suppressed_count: int  # lines skipped due to the inline "sentinel-scan:ignore" marker
+    # Both counts exist so a suppression rule can never silently blind the scan with zero
+    # trace in the output — visible-but-unaudited is the deliberate proportionate middle
+    # ground for a single-user CLI, short of a full suppression-authorization model.
 
 
 def scan_directory_with_stats(root: str, extra_ignore_patterns: list[str] | None = None) -> DirectoryScanResult:
     ignore_patterns = load_ignore_patterns(root) + (extra_ignore_patterns or [])
     findings: list[Finding] = []
     ignored_file_count = 0
+    inline_suppressed_count = 0
     for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
         for filename in filenames:
@@ -193,8 +207,11 @@ def scan_directory_with_stats(root: str, extra_ignore_patterns: list[str] | None
             if is_ignored(full_path, root, ignore_patterns):
                 ignored_file_count += 1
                 continue
-            findings.extend(scan_file(full_path))
-    return DirectoryScanResult(findings=findings, ignored_file_count=ignored_file_count)
+            file_findings, file_suppressed = _scan_file_with_stats(full_path)
+            findings.extend(file_findings)
+            inline_suppressed_count += file_suppressed
+    return DirectoryScanResult(findings=findings, ignored_file_count=ignored_file_count,
+                                inline_suppressed_count=inline_suppressed_count)
 
 
 def scan_directory(root: str, extra_ignore_patterns: list[str] | None = None) -> list[Finding]:

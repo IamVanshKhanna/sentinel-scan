@@ -1,6 +1,12 @@
 import os
 
-from sentinel_scan.secrets import is_binary, scan_directory, scan_file, shannon_entropy
+from sentinel_scan.secrets import (
+    is_binary,
+    scan_directory,
+    scan_directory_with_stats,
+    scan_file,
+    shannon_entropy,
+)
 
 FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures")
 
@@ -147,3 +153,25 @@ def test_scan_directory_extra_ignore_patterns(tmp_path):
     f.write_text('AWS_ACCESS_KEY = "AKIAABCDEFGHIJKLMNOP"\n')
     findings = scan_directory(str(tmp_path), extra_ignore_patterns=["secret.py"])
     assert findings == []
+
+
+def test_inline_ignore_marker_is_counted_not_just_silently_dropped(tmp_path):
+    """Inline suppressions must be visible in aggregate, same principle as the
+    .sentinelignore/--exclude file-level suppression count."""
+    f = tmp_path / "config.py"
+    f.write_text(
+        'AWS_ACCESS_KEY = "AKIAABCDEFGHIJKLMNOP"  # sentinel-scan:ignore\n'
+        'x = 1\n'
+    )
+    result = scan_directory_with_stats(str(tmp_path))
+    assert result.findings == []
+    assert result.inline_suppressed_count == 1
+
+
+def test_ignored_file_count_and_inline_count_are_independent(tmp_path):
+    (tmp_path / "a.py").write_text('AWS_ACCESS_KEY = "AKIAABCDEFGHIJKLMNOP"  # sentinel-scan:ignore\n')
+    (tmp_path / "b.py").write_text('AWS_ACCESS_KEY = "AKIAABCDEFGHIJKLMNOP"\n')
+    result = scan_directory_with_stats(str(tmp_path), extra_ignore_patterns=["b.py"])
+    assert result.ignored_file_count == 1
+    assert result.inline_suppressed_count == 1
+    assert result.findings == []

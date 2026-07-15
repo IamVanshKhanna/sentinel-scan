@@ -62,6 +62,18 @@ sentinel-scan /path/to/repo --fail-on high  # exit 1 if a high/critical finding 
 
 ---
 
+## Known Limitations
+
+Documented explicitly rather than left implicit — this doesn't try to be a complete tool, and pretending otherwise would undercut the point of building something small and understandable:
+
+- **Won't catch obfuscated or split secrets.** A key concatenated across two string literals, base64-wrapped, or built at runtime from fragments defeats every regex-and-entropy scanner in this category, not just this one.
+- **`.sentinelignore` uses `fnmatch` glob semantics, not `.gitignore` semantics** — no `**` recursive-directory matching. A pattern that looks like it should match nested paths the way `.gitignore` does may not; test your patterns before relying on them.
+- **`--history` only walks the current branch's linear history** via `git log -p`. A secret that only ever existed on a squash-merged feature branch (and was squashed away before merge) won't show up.
+- **Suppression is visible-but-unaudited, not access-controlled.** `.sentinelignore`, `--exclude`, and inline `sentinel-scan:ignore` markers are counted and surfaced in output (so a suppression rule can't silently blind a scan with zero trace), but anyone with write access to the repo can add one — there's no separate authorization step, which is a proportionate tradeoff for a single-user CLI, not a claim this is safe for an adversarial multi-contributor setting without review.
+- **Entropy threshold (`4.3`) is empirically chosen, not calibrated against a labeled corpus.** It's the same category of technique gitleaks/truffleHog use, without their years of tuning against real-world false-positive/negative data.
+
+---
+
 ## Repository Structure
 
 ```

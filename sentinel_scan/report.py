@@ -6,6 +6,10 @@ import json
 
 from .scoring import risk_score, severity_rank
 
+# Bump this whenever a field is added/removed/renamed in the JSON output shape — the only
+# compatibility signal a downstream consumer (CI dashboard, PR-comment bot) has.
+JSON_SCHEMA_VERSION = 1
+
 try:
     from rich.console import Console
     from rich.table import Table
@@ -89,6 +93,7 @@ def render_json(secret_findings: list, vuln_findings: list, target: str,
                  history_findings: list | None = None, deps_check_ok: bool = True) -> str:
     history_findings = history_findings or []
     return json.dumps({
+        "schema_version": JSON_SCHEMA_VERSION,
         "target": target,
         "risk_score": risk_score(secret_findings, vuln_findings, history_findings),
         "secrets": [f.__dict__ for f in secret_findings],

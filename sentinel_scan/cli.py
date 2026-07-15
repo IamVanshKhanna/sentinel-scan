@@ -59,6 +59,9 @@ def main(argv: list[str] | None = None) -> int:
     if secret_scan.ignored_file_count > 0:
         print(f"\n{secret_scan.ignored_file_count} file(s) skipped by .sentinelignore / --exclude rules.",
               file=sys.stderr)
+    if secret_scan.inline_suppressed_count > 0:
+        print(f"{secret_scan.inline_suppressed_count} line(s) suppressed by inline "
+              f"'sentinel-scan:ignore' markers.", file=sys.stderr)
     if not deps_check_ok:
         print("WARNING: dependency vulnerability check failed (network/API error) — "
               "results are INCOMPLETE, not verified clean.", file=sys.stderr)

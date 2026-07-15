@@ -128,6 +128,20 @@ def test_no_double_report_when_regex_and_entropy_both_would_match(tmp_path):
     assert "high_entropy_string" not in kinds
 
 
+def test_second_independent_secret_on_same_line_still_reported(tmp_path):
+    """A regex match earlier on a line must not blanket-suppress a genuinely separate
+    high-entropy secret later on the same line — that's a real finding getting dropped,
+    not noise reduction."""
+    f = tmp_path / "config.py"
+    f.write_text(
+        'api_key = "aK9xQ2zR7mP4wL8vB1nC6dE3fG5hJ0kM"; '
+        'backup_token = "zR7mK9xQ2vB1nC6dE3fG5hJ0kMaK9xQ2z"\n'
+    )
+    findings = scan_file(str(f))
+    kinds = [x.kind for x in findings]
+    assert kinds.count("generic_secret_assignment") == 2
+
+
 def test_scan_directory_extra_ignore_patterns(tmp_path):
     f = tmp_path / "secret.py"
     f.write_text('AWS_ACCESS_KEY = "AKIAABCDEFGHIJKLMNOP"\n')

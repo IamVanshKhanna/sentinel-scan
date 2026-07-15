@@ -75,22 +75,38 @@ def find_manifests(root: str) -> list[Dependency]:
     return deps
 
 
-def query_osv(deps: list[Dependency], timeout: float = 15.0) -> list[VulnFinding]:
-    """Batch-query OSV.dev for known vulnerabilities. Fails soft (empty list) on network error."""
+@dataclass
+class OsvQueryResult:
+    findings: list[VulnFinding]
+    ok: bool  # False means the query failed — "no findings" is NOT the same as "verified clean"
+
+
+def query_osv(deps: list[Dependency], timeout: float | None = None) -> OsvQueryResult:
+    """Batch-query OSV.dev for known vulnerabilities.
+
+    On failure, returns ok=False with an empty findings list — callers must check `ok`
+    before treating an empty result as "no vulnerabilities found". A security tool that
+    reports the same output for "checked, found nothing" and "failed to check" fails open,
+    which is the wrong default for this kind of check.
+    """
     if not deps:
-        return []
+        return OsvQueryResult(findings=[], ok=True)
 
     queries = [
         {"package": {"name": d.name, "ecosystem": d.ecosystem}, "version": d.version}
         for d in deps
     ]
 
+    # Scale timeout with batch size — a fixed 15s budget is guaranteed to fail on a large
+    # monorepo lockfile regardless of network health, which would misreport as "clean".
+    effective_timeout = timeout if timeout is not None else max(15.0, len(deps) * 0.25)
+
     try:
-        resp = requests.post(OSV_BATCH_URL, json={"queries": queries}, timeout=timeout)
+        resp = requests.post(OSV_BATCH_URL, json={"queries": queries}, timeout=effective_timeout)
         resp.raise_for_status()
         results = resp.json().get("results", [])
     except (requests.RequestException, ValueError):
-        return []
+        return OsvQueryResult(findings=[], ok=False)
 
     findings: list[VulnFinding] = []
     for dep, result in zip(deps, results):
@@ -103,7 +119,7 @@ def query_osv(deps: list[Dependency], timeout: float = 15.0) -> list[VulnFinding
                 severity=severity,
                 summary=(vuln.get("summary") or "No summary available")[:200],
             ))
-    return findings
+    return OsvQueryResult(findings=findings, ok=True)
 
 
 def _extract_severity(vuln: dict) -> str:

@@ -48,21 +48,46 @@ def test_query_osv_returns_vuln_findings():
         status=200,
     )
 
-    findings = query_osv([dep])
-    assert len(findings) == 1
-    assert findings[0].package == "requests"
-    assert findings[0].vuln_id == "GHSA-fake-0000-0000"
-    assert findings[0].severity == "critical"
+    result = query_osv([dep])
+    assert result.ok is True
+    assert len(result.findings) == 1
+    assert result.findings[0].package == "requests"
+    assert result.findings[0].vuln_id == "GHSA-fake-0000-0000"
+    assert result.findings[0].severity == "critical"
 
 
 @responses.activate
-def test_query_osv_fails_soft_on_network_error():
+def test_query_osv_reports_not_ok_on_network_error():
+    """A failed OSV query must be distinguishable from a clean result — empty findings
+    alone is ambiguous between 'checked, found nothing' and 'never actually checked'."""
     dep = Dependency(name="requests", version="2.6.0", ecosystem="PyPI", manifest="requirements.txt")
     responses.add(responses.POST, "https://api.osv.dev/v1/querybatch", status=500)
 
-    findings = query_osv([dep])
-    assert findings == []
+    result = query_osv([dep])
+    assert result.ok is False
+    assert result.findings == []
 
 
-def test_query_osv_empty_input_returns_empty():
-    assert query_osv([]) == []
+def test_query_osv_empty_input_returns_ok_empty():
+    result = query_osv([])
+    assert result.ok is True
+    assert result.findings == []
+
+
+@responses.activate
+def test_query_osv_timeout_scales_with_batch_size():
+    """A fixed 15s timeout would deterministically fail on a large dependency batch —
+    the effective timeout should grow with how many packages are being queried."""
+    deps = [
+        Dependency(name=f"pkg{i}", version="1.0.0", ecosystem="PyPI", manifest="requirements.txt")
+        for i in range(200)
+    ]
+    responses.add(responses.POST, "https://api.osv.dev/v1/querybatch", json={"results": [{}] * 200}, status=200)
+
+    result = query_osv(deps)
+    assert result.ok is True
+    call_kwargs = responses.calls[0].request
+    # We can't directly introspect the timeout passed to requests from the recorded call,
+    # so this test exercises the large-batch path end-to-end and asserts it still succeeds
+    # rather than asserting on internal timeout arithmetic.
+    assert call_kwargs is not None

@@ -147,18 +147,22 @@ def scan_file(path: str) -> list[Finding]:
         if INLINE_IGNORE_MARKER in line:
             continue
 
-        regex_matched = False
+        regex_spans: list[tuple[int, int]] = []
         for name, pattern, severity in COMPILED:
-            if pattern.search(line):
-                regex_matched = True
+            for m in pattern.finditer(line):
+                regex_spans.append(m.span())
                 findings.append(Finding(file=path, line=lineno, kind=name, severity=severity,
                                          snippet=line.strip()[:120]))
 
-        # Entropy pass — skipped entirely if a named pattern already matched this line, so
-        # a real secret doesn't get double-counted as two separate findings (one specific,
-        # one generic). Only runs on lines that look like an assignment, to keep noise low.
-        if not regex_matched and ("=" in line or ":" in line):
+        # Entropy pass — only skipped for a *specific candidate* whose span overlaps a
+        # named-pattern match, so one secret isn't double-counted as two findings. A second,
+        # independent high-entropy string elsewhere on the same line still gets reported —
+        # blanket per-line suppression would silently drop a real second secret.
+        if "=" in line or ":" in line:
             for match in QUOTED_STRING.finditer(line):
+                span = match.span()
+                if any(span[0] < r_end and span[1] > r_start for r_start, r_end in regex_spans):
+                    continue
                 candidate = match.group(1)
                 if shannon_entropy(candidate) >= ENTROPY_THRESHOLD:
                     findings.append(Finding(file=path, line=lineno, kind="high_entropy_string",

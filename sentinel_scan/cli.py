@@ -34,20 +34,27 @@ def main(argv: list[str] | None = None) -> int:
     secret_findings = secrets.scan_directory(args.path, extra_ignore_patterns=args.exclude)
 
     vuln_findings = []
+    deps_check_ok = True
     if not args.no_deps:
         found_deps = deps.find_manifests(args.path)
-        vuln_findings = deps.query_osv(found_deps)
+        osv_result = deps.query_osv(found_deps)
+        vuln_findings = osv_result.findings
+        deps_check_ok = osv_result.ok
 
     history_findings = []
     if args.history:
         history_findings = history.scan_history(args.path, max_commits=args.max_commits)
 
     if args.json:
-        print(report.render_json(secret_findings, vuln_findings, args.path, history_findings))
+        print(report.render_json(secret_findings, vuln_findings, args.path, history_findings, deps_check_ok))
     elif args.markdown:
-        print(report.render_markdown(secret_findings, vuln_findings, args.path, history_findings))
+        print(report.render_markdown(secret_findings, vuln_findings, args.path, history_findings, deps_check_ok))
     else:
-        report.render_table(secret_findings, vuln_findings, args.path, history_findings)
+        report.render_table(secret_findings, vuln_findings, args.path, history_findings, deps_check_ok)
+
+    if not deps_check_ok:
+        print("\nWARNING: dependency vulnerability check failed (network/API error) — "
+              "results are INCOMPLETE, not verified clean.", file=sys.stderr)
 
     if args.fail_on != "none":
         threshold = FAIL_ON_THRESHOLD[args.fail_on]

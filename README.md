@@ -26,7 +26,7 @@
 2. **Dependency vulnerability check** — parses `requirements.txt` and `package.json`, queries [OSV.dev](https://osv.dev) (Google's open-source vulnerability database, free, no API key) for known CVEs per package/version.
 3. **Scored report** — every finding gets a severity (critical/high/medium/low); a total risk score is computed from the weighted sum.
 
-Built because my own repos needed exactly this before going public, and every existing tool in this space (gitleaks, truffleHog, Snyk) is either narrower in scope or requires an account. This does both secrets and dependency vulns in one pass, with zero required signup.
+Built to understand the technique, not to replace gitleaks or truffleHog — those are maintained, team-backed tools with curated ruleset libraries and (in truffleHog's case) live credential verification this doesn't attempt. This is a small, from-scratch implementation of the same core idea (regex + entropy detection, dependency CVE lookup) applied to my own repos before they went public, kept intentionally readable end to end.
 
 ---
 

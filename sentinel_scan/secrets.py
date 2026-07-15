@@ -10,6 +10,12 @@ from dataclasses import dataclass
 
 SKIP_DIRS = {".git", "node_modules", "venv", ".venv", "__pycache__", "dist", "build", ".next"}
 
+# Files larger than this are skipped outright — a stray data dump or log file
+# shouldn't be read entirely into memory just to be regex-scanned line by line.
+MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024  # 5MB
+
+BINARY_SNIFF_BYTES = 8192
+
 # Lockfiles are full of legitimate high-entropy hashes (SRI integrity, checksums) —
 # scanning them for secrets is pure noise, not signal.
 SKIP_FILES = {
@@ -96,6 +102,17 @@ def is_ignored(path: str, root: str, ignore_patterns: list[str]) -> bool:
                for pat in ignore_patterns)
 
 
+def is_binary(path: str) -> bool:
+    """Sniff the first chunk of a file for a null byte — the standard, extension-independent
+    signal that a file is binary rather than text. Cheap: reads at most BINARY_SNIFF_BYTES."""
+    try:
+        with open(path, "rb") as f:
+            chunk = f.read(BINARY_SNIFF_BYTES)
+    except OSError:
+        return True  # unreadable — treat as skip-worthy, not as a scannable text file
+    return b"\x00" in chunk
+
+
 def check_filename(path: str) -> list[Finding]:
     findings: list[Finding] = []
     basename = os.path.basename(path)
@@ -107,7 +124,18 @@ def check_filename(path: str) -> list[Finding]:
 
 
 def scan_file(path: str) -> list[Finding]:
+    # Filename-based detection runs regardless of binary/size status — a binary .pem or
+    # .key file is still exactly the kind of thing this check exists to catch.
     findings: list[Finding] = check_filename(path)
+
+    try:
+        if os.path.getsize(path) > MAX_FILE_SIZE_BYTES:
+            return findings
+    except OSError:
+        return findings
+
+    if is_binary(path):
+        return findings
 
     try:
         with open(path, encoding="utf-8", errors="ignore") as f:
@@ -119,13 +147,17 @@ def scan_file(path: str) -> list[Finding]:
         if INLINE_IGNORE_MARKER in line:
             continue
 
+        regex_matched = False
         for name, pattern, severity in COMPILED:
             if pattern.search(line):
+                regex_matched = True
                 findings.append(Finding(file=path, line=lineno, kind=name, severity=severity,
                                          snippet=line.strip()[:120]))
 
-        # Entropy pass — only on lines that look like an assignment, to keep false positives low.
-        if "=" in line or ":" in line:
+        # Entropy pass — skipped entirely if a named pattern already matched this line, so
+        # a real secret doesn't get double-counted as two separate findings (one specific,
+        # one generic). Only runs on lines that look like an assignment, to keep noise low.
+        if not regex_matched and ("=" in line or ":" in line):
             for match in QUOTED_STRING.finditer(line):
                 candidate = match.group(1)
                 if shannon_entropy(candidate) >= ENTROPY_THRESHOLD:
@@ -135,8 +167,8 @@ def scan_file(path: str) -> list[Finding]:
     return findings
 
 
-def scan_directory(root: str) -> list[Finding]:
-    ignore_patterns = load_ignore_patterns(root)
+def scan_directory(root: str, extra_ignore_patterns: list[str] | None = None) -> list[Finding]:
+    ignore_patterns = load_ignore_patterns(root) + (extra_ignore_patterns or [])
     findings: list[Finding] = []
     for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]

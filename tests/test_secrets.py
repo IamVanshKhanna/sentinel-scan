@@ -1,6 +1,6 @@
 import os
 
-from sentinel_scan.secrets import scan_directory, scan_file, shannon_entropy
+from sentinel_scan.secrets import is_binary, scan_directory, scan_file, shannon_entropy
 
 FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures")
 
@@ -84,4 +84,52 @@ def test_shell_env_var_reference_not_flagged(tmp_path):
     f = tmp_path / "script.sh"
     f.write_text('TELEGRAM_BOT_TOKEN="${TELEGRAM_BOT_TOKEN:-}"\n')
     findings = scan_file(str(f))
+    assert findings == []
+
+
+def test_is_binary_detects_null_bytes(tmp_path):
+    binary_file = tmp_path / "binary.dat"
+    binary_file.write_bytes(b"\x00\x01\x02\xff\xfe")
+    assert is_binary(str(binary_file)) is True
+
+
+def test_is_binary_false_for_text_file(tmp_path):
+    text_file = tmp_path / "text.txt"
+    text_file.write_text("just plain text\n")
+    assert is_binary(str(text_file)) is False
+
+
+def test_binary_file_content_not_scanned_but_filename_check_still_runs(tmp_path):
+    """A binary .pem file should still be flagged by filename, but not content-scanned."""
+    binary_pem = tmp_path / "binary.pem"
+    binary_pem.write_bytes(b"\x00\x01" + b"AKIAABCDEFGHIJKLMNOP")  # secret-shaped bytes after null byte
+    findings = scan_file(str(binary_pem))
+    kinds = {f.kind for f in findings}
+    assert "pem_key_file" in kinds  # filename check still fires
+    assert "aws_access_key" not in kinds  # content was never line-scanned
+
+
+def test_oversized_file_is_skipped(tmp_path, monkeypatch):
+    from sentinel_scan import secrets as secrets_module
+    monkeypatch.setattr(secrets_module, "MAX_FILE_SIZE_BYTES", 10)  # artificially tiny cap
+    f = tmp_path / "big.py"
+    f.write_text('AWS_ACCESS_KEY = "AKIAABCDEFGHIJKLMNOP"\n')  # well over 10 bytes
+    findings = scan_file(str(f))
+    assert findings == []
+
+
+def test_no_double_report_when_regex_and_entropy_both_would_match(tmp_path):
+    """A line matched by a named pattern shouldn't also generate a separate entropy finding."""
+    f = tmp_path / "config.py"
+    f.write_text('api_key = "aK9xQ2zR7mP4wL8vB1nC6dE3fG5hJ0kM"\n')
+    findings = scan_file(str(f))
+    kinds = [x.kind for x in findings]
+    assert kinds.count("generic_secret_assignment") == 1
+    assert "high_entropy_string" not in kinds
+
+
+def test_scan_directory_extra_ignore_patterns(tmp_path):
+    f = tmp_path / "secret.py"
+    f.write_text('AWS_ACCESS_KEY = "AKIAABCDEFGHIJKLMNOP"\n')
+    findings = scan_directory(str(tmp_path), extra_ignore_patterns=["secret.py"])
     assert findings == []

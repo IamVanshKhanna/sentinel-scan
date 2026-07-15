@@ -5,7 +5,10 @@ from __future__ import annotations
 import argparse
 import sys
 
-from . import deps, history, report, secrets
+from . import __version__, deps, history, report, secrets
+from .scoring import severity_rank
+
+FAIL_ON_THRESHOLD = {"critical": 0, "high": 1, "medium": 2, "low": 3}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -14,9 +17,12 @@ def main(argv: list[str] | None = None) -> int:
         description="Scan a repository for hardcoded secrets and known-vulnerable dependencies.",
     )
     parser.add_argument("path", help="Directory to scan")
+    parser.add_argument("--version", action="version", version=f"sentinel-scan {__version__}")
     parser.add_argument("--json", action="store_true", help="Output JSON instead of a table")
     parser.add_argument("--markdown", action="store_true", help="Output Markdown instead of a table")
     parser.add_argument("--no-deps", action="store_true", help="Skip the dependency vulnerability check")
+    parser.add_argument("--exclude", action="append", default=[], metavar="PATTERN",
+                         help="Glob pattern to exclude (repeatable). Supplements .sentinelignore, doesn't replace it.")
     parser.add_argument("--history", action="store_true",
                          help="Also scan git commit history for secrets removed from HEAD but still present in old commits")
     parser.add_argument("--max-commits", type=int, default=500,
@@ -25,7 +31,7 @@ def main(argv: list[str] | None = None) -> int:
                          default="none", help="Exit non-zero if a finding at or above this severity exists")
     args = parser.parse_args(argv)
 
-    secret_findings = secrets.scan_directory(args.path)
+    secret_findings = secrets.scan_directory(args.path, extra_ignore_patterns=args.exclude)
 
     vuln_findings = []
     if not args.no_deps:
@@ -44,8 +50,7 @@ def main(argv: list[str] | None = None) -> int:
         report.render_table(secret_findings, vuln_findings, args.path, history_findings)
 
     if args.fail_on != "none":
-        threshold = {"critical": 0, "high": 1, "medium": 2, "low": 3}[args.fail_on]
-        from .scoring import severity_rank
+        threshold = FAIL_ON_THRESHOLD[args.fail_on]
         all_severities = (
             [f.severity for f in secret_findings]
             + [v.severity for v in vuln_findings]

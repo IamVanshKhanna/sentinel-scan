@@ -43,9 +43,13 @@ def render_table(secret_findings: list, vuln_findings: list, target: str,
         if secret_findings:
             table = Table(title="Secrets")
             table.add_column("Severity")
-            table.add_column("File")
+            # overflow="fold" everywhere a value can be long — Rich's default "ellipsis"
+            # overflow style uses U+2026 ('...'), which renders as a mangled '?' on
+            # Windows' default (non-UTF-8) console codepage. fold wraps instead of
+            # truncating with a special character, which is safe on every platform.
+            table.add_column("File", overflow="fold")
             table.add_column("Line")
-            table.add_column("Kind")
+            table.add_column("Kind", overflow="fold")
             table.add_column("Snippet", overflow="fold")
             for f in sorted(secret_findings, key=lambda x: severity_rank(x.severity)):
                 table.add_row(f.severity.upper(), f.file, str(f.line), f.kind, f.snippet)
@@ -54,9 +58,9 @@ def render_table(secret_findings: list, vuln_findings: list, target: str,
         if vuln_findings:
             table = Table(title="Vulnerable Dependencies")
             table.add_column("Severity")
-            table.add_column("Package")
+            table.add_column("Package", overflow="fold")
             table.add_column("Version")
-            table.add_column("Vuln ID")
+            table.add_column("Vuln ID", overflow="fold")
             table.add_column("Summary", overflow="fold")
             for v in sorted(vuln_findings, key=lambda x: severity_rank(x.severity)):
                 table.add_row(v.severity.upper(), v.package, v.version, v.vuln_id, v.summary)
@@ -66,8 +70,8 @@ def render_table(secret_findings: list, vuln_findings: list, target: str,
             table = Table(title="Secrets in Git History (present in old commits, may be gone from HEAD)")
             table.add_column("Severity")
             table.add_column("Commit")
-            table.add_column("File")
-            table.add_column("Kind")
+            table.add_column("File", overflow="fold")
+            table.add_column("Kind", overflow="fold")
             table.add_column("Snippet", overflow="fold")
             for h in sorted(history_findings, key=lambda x: severity_rank(x.severity)):
                 table.add_row(h.severity.upper(), h.commit, h.file, h.kind, h.snippet)

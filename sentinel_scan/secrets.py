@@ -46,8 +46,15 @@ PATTERNS: list[tuple[str, str, str]] = [
     ("stripe_live_key", r"[sr]k_live_[A-Za-z0-9]{20,}", "critical"),
     ("stripe_test_key", r"[sr]k_test_[A-Za-z0-9]{20,}", "medium"),
     ("jwt_token", r"eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+", "high"),
+    # Excludes common placeholder passwords (***, xxxx, password, testpass, changeme,
+    # example, secret) and variable references (${VAR}, $VAR) — .env.example/docker-compose
+    # files routinely contain connection strings with a placeholder or an interpolated env
+    # var in the password slot, and without this exclusion every such file gets flagged
+    # "critical" for a credential that was never actually hardcoded.
     ("db_connection_string_with_creds",
-     r"(?i)(postgres|postgresql|mysql|mongodb(\+srv)?)://[^:\s]+:[^@\s]+@[^/\s]+", "critical"),
+     r"(?i)(postgres|postgresql|mysql|mongodb(\+srv)?)://[^:\s]+:"
+     r"(?!(?:\*+|x+|password|passwd|test\w*|changeme|example|secret|admin)@)(?!\$)[^@\s]+@[^/\s]+",
+     "critical"),
     # Excludes values starting with $ or {{ — those are variable references / template
     # placeholders (${VAR}, $VAR, {{ jinja }}), not literal hardcoded secrets.
     ("generic_secret_assignment",
@@ -79,6 +86,21 @@ def shannon_entropy(s: str) -> float:
 
 QUOTED_STRING = re.compile(r"""['"]([A-Za-z0-9+/=_\-]{20,})['"]""")
 ENTROPY_THRESHOLD = 4.3  # empirically: random base64/hex secrets sit well above this; words/paths sit below
+
+PLACEHOLDER_BODY_MARKER = re.compile(r"(?i)\bfake\b|\bplaceholder\b|\.\.\.|\bxxxxx|\byour[_-]?key\b|\bexample\b")
+
+
+def _next_lines_look_like_placeholder(lines: list[str], lineno: int, peek: int = 2) -> bool:
+    """Check the next `peek` lines (1-indexed lineno, so lines[lineno] is the line after
+    the match) for an obvious placeholder marker — used to tell 'here's what a private key
+    looks like' documentation apart from an actual committed key body."""
+    for offset in range(peek):
+        idx = lineno + offset
+        if idx >= len(lines):
+            break
+        if PLACEHOLDER_BODY_MARKER.search(lines[idx]):
+            return True
+    return False
 
 
 def load_ignore_patterns(root: str) -> list[str]:
@@ -160,6 +182,11 @@ def _scan_file_with_stats(path: str) -> tuple[list[Finding], int]:
         regex_spans: list[tuple[int, int]] = []
         for name, pattern, severity in COMPILED:
             for m in pattern.finditer(line):
+                if name == "private_key_header" and _next_lines_look_like_placeholder(lines, lineno):
+                    # A "-----BEGIN PRIVATE KEY-----" header followed by "...", "FAKE...",
+                    # or similar is documentation showing the *shape* of a key (setup guides
+                    # routinely do this), not an actual committed key body.
+                    continue
                 regex_spans.append(m.span())
                 findings.append(Finding(file=path, line=lineno, kind=name, severity=severity,
                                          snippet=line.strip()[:120]))

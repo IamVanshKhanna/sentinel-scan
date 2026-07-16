@@ -175,3 +175,66 @@ def test_ignored_file_count_and_inline_count_are_independent(tmp_path):
     assert result.ignored_file_count == 1
     assert result.inline_suppressed_count == 1
     assert result.findings == []
+
+
+def test_db_connection_string_with_real_password_still_flagged(tmp_path):
+    f = tmp_path / "config.py"
+    f.write_text('DATABASE_URL = "postgresql://app:Xk9mQ2vRfP7nL4wE@db.example.com:5432/prod"\n')
+    findings = scan_file(str(f))
+    kinds = {x.kind for x in findings}
+    assert "db_connection_string_with_creds" in kinds
+
+
+def test_db_connection_string_placeholder_password_not_flagged(tmp_path):
+    """A .env.example / docker-compose template with a placeholder in the password slot
+    (***, testpass, changeme, xxxx) is not a real leaked credential."""
+    placeholders = [
+        'DATABASE_URL=postgresql://devpilot:***@postgres:5432/devpilot',
+        'DATABASE_URL: postgresql://devpilot:testpass@localhost:5432/devpilot_test',
+        'DATABASE_URL=postgresql://user:changeme@db:5432/app',
+        'DATABASE_URL=postgresql://user:xxxxxxxx@db:5432/app',
+        'DATABASE_URL=postgresql://user:password@localhost:5432/devpilot',
+    ]
+    for i, line in enumerate(placeholders):
+        f = tmp_path / f"placeholder_{i}.env"
+        f.write_text(line + "\n")
+        findings = scan_file(str(f))
+        kinds = {x.kind for x in findings}
+        assert "db_connection_string_with_creds" not in kinds, f"false positive on: {line}"
+
+
+def test_private_key_header_with_real_body_still_flagged(tmp_path):
+    f = tmp_path / "id_rsa.txt"
+    f.write_text(
+        "-----BEGIN RSA PRIVATE KEY-----\n"
+        "MIIEpAIBAAKCAQEA1c7wJnEXAMPLEREALLOOKINGBASE64BODYNOTAPLACEHOLDERxyz\n"
+        "-----END RSA PRIVATE KEY-----\n"
+    )
+    findings = scan_file(str(f))
+    kinds = {x.kind for x in findings}
+    assert "private_key_header" in kinds
+
+
+def test_db_connection_string_env_var_reference_not_flagged(tmp_path):
+    """DB_URL: postgresql://user:${DB_PASSWORD}@host/db is an interpolated env var,
+    not a hardcoded credential — same class of false positive already fixed for
+    generic_secret_assignment, found via self-testing against a real repo."""
+    f = tmp_path / "docker-compose.yml"
+    f.write_text('DB_CONNECTION_URI: postgresql://infisical:${INFISICAL_DB_PASSWORD}@db:5432/infisical\n')
+    findings = scan_file(str(f))
+    kinds = {x.kind for x in findings}
+    assert "db_connection_string_with_creds" not in kinds
+
+
+def test_private_key_header_placeholder_body_not_flagged(tmp_path):
+    """A setup guide showing 'here's what a private key looks like' with '...' or
+    'FAKE'/'PLACEHOLDER' as the body isn't an actually-committed key."""
+    f = tmp_path / "SETUP.md"
+    f.write_text(
+        "GITHUB_PRIVATE_KEY=\"-----BEGIN RSA PRIVATE KEY-----\n"
+        "...\n"
+        "-----END RSA PRIVATE KEY-----\"\n"
+    )
+    findings = scan_file(str(f))
+    kinds = {x.kind for x in findings}
+    assert "private_key_header" not in kinds

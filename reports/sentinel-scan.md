@@ -1,0 +1,159 @@
+# sentinel-scan report — `sentinel-scan`
+
+**Triage summary:** Highest score, and 100% expected — this is the tool scanning its own test fixtures, which deliberately contain planted fake secrets (correct format, not live credentials — documented in `tests/fixtures/` and the README) to prove each detector actually fires. Every single finding here is either a fixture or the tool correctly flagging its own README/CHANGELOG for *mentioning* things like "AKIA..." as prose. Included in this batch for completeness — a "0 findings" report on the scanner's own repo would actually be a red flag (it would mean the fixture-based tests aren't testing what they claim to).
+
+**Risk score:** 677
+
+## Secrets
+| Severity | File | Line | Kind |
+|---|---|---|---|
+| CRITICAL | `sentinel-scan/tests/test_secrets.py` | 111 | aws_access_key |
+| CRITICAL | `sentinel-scan/tests/test_secrets.py` | 122 | aws_access_key |
+| CRITICAL | `sentinel-scan/tests/test_secrets.py` | 153 | aws_access_key |
+| CRITICAL | `sentinel-scan/tests/test_secrets.py` | 173 | aws_access_key |
+| CRITICAL | `sentinel-scan/tests/test_history.py` | 19 | aws_access_key |
+| CRITICAL | `sentinel-scan/tests/test_cli.py` | 15 | aws_access_key |
+| CRITICAL | `sentinel-scan/tests/test_cli.py` | 25 | aws_access_key |
+| CRITICAL | `sentinel-scan/tests/test_cli.py` | 35 | aws_access_key |
+| CRITICAL | `sentinel-scan/tests/test_cli.py` | 53 | aws_access_key |
+| CRITICAL | `sentinel-scan/tests/fixtures/planted_secrets.py` | 10 | aws_access_key |
+| CRITICAL | `sentinel-scan/tests/fixtures/planted_secrets.py` | 13 | github_token |
+| CRITICAL | `sentinel-scan/tests/fixtures/planted_secrets.py` | 18 | private_key_header |
+| CRITICAL | `sentinel-scan/tests/fixtures/planted_secrets.py` | 23 | stripe_live_key |
+| CRITICAL | `sentinel-scan/tests/fixtures/planted_secrets.py` | 29 | db_connection_string_with_creds |
+| CRITICAL | `sentinel-scan/tests/fixtures/fake.pem` | 0 | pem_key_file |
+| CRITICAL | `sentinel-scan/tests/fixtures/ignore-test/ignored_secret.py` | 2 | aws_access_key |
+| HIGH | `sentinel-scan/tests/fixtures/planted_secrets.py` | 26 | jwt_token |
+| MEDIUM | `sentinel-scan/tests/test_secrets.py` | 130 | generic_secret_assignment |
+| MEDIUM | `sentinel-scan/tests/test_secrets.py` | 143 | generic_secret_assignment |
+| MEDIUM | `sentinel-scan/tests/test_secrets.py` | 144 | generic_secret_assignment |
+| MEDIUM | `sentinel-scan/tests/fixtures/planted_secrets.py` | 13 | generic_secret_assignment |
+| MEDIUM | `sentinel-scan/tests/fixtures/planted_secrets.py` | 16 | generic_secret_assignment |
+
+## Vulnerable Dependencies
+| Severity | Package | Version | Vuln ID |
+|---|---|---|---|
+| MEDIUM | requests | 2.6.0 | GHSA-9hjg-9r4m-mvj7 |
+| MEDIUM | requests | 2.6.0 | GHSA-9wx4-h78v-vm56 |
+| MEDIUM | requests | 2.6.0 | GHSA-gc5v-m9x4-r6x2 |
+| MEDIUM | requests | 2.6.0 | GHSA-j8r2-6x86-q33q |
+| MEDIUM | requests | 2.6.0 | GHSA-x84v-xcm2-53pg |
+| MEDIUM | requests | 2.6.0 | PYSEC-2018-28 |
+| MEDIUM | requests | 2.6.0 | PYSEC-2023-74 |
+| MEDIUM | requests | 2.6.0 | PYSEC-2026-1872 |
+| MEDIUM | requests | 2.6.0 | PYSEC-2026-1873 |
+| MEDIUM | requests | 2.6.0 | PYSEC-2026-2275 |
+| MEDIUM | django | 1.4 | GHSA-2655-q453-22f9 |
+| MEDIUM | django | 1.4 | GHSA-296w-6qhq-gf92 |
+| MEDIUM | django | 1.4 | GHSA-4c42-4rxm-x6qf |
+| MEDIUM | django | 1.4 | GHSA-59w8-4wm2-4xw8 |
+| MEDIUM | django | 1.4 | GHSA-5h2q-4hrp-v9rr |
+| MEDIUM | django | 1.4 | GHSA-625g-gx8c-xcmg |
+| MEDIUM | django | 1.4 | GHSA-6565-fg86-6jcx |
+| MEDIUM | django | 1.4 | GHSA-68w8-qjq3-2gfm |
+| MEDIUM | django | 1.4 | GHSA-6w2r-r2m5-xq5w |
+| MEDIUM | django | 1.4 | GHSA-78vx-ggch-wghm |
+| MEDIUM | django | 1.4 | GHSA-7fq8-4pv5-5w5c |
+| MEDIUM | django | 1.4 | GHSA-7qfw-j7hp-v45g |
+| MEDIUM | django | 1.4 | GHSA-7xr5-9hcq-chf9 |
+| MEDIUM | django | 1.4 | GHSA-89hj-xfx5-7q66 |
+| MEDIUM | django | 1.4 | GHSA-8x94-hmjh-97hq |
+| MEDIUM | django | 1.4 | GHSA-9cwg-mhxf-hh59 |
+| MEDIUM | django | 1.4 | GHSA-c8c8-9472-w52h |
+| MEDIUM | django | 1.4 | GHSA-crhm-qpjc-cm64 |
+| MEDIUM | django | 1.4 | GHSA-f7cm-ccfp-3q4r |
+| MEDIUM | django | 1.4 | GHSA-fp6p-5xvw-m74f |
+| MEDIUM | django | 1.4 | GHSA-frmv-pr5f-9mcr |
+| MEDIUM | django | 1.4 | GHSA-g8xg-jgj6-49r3 |
+| MEDIUM | django | 1.4 | GHSA-gv98-g628-m9x5 |
+| MEDIUM | django | 1.4 | GHSA-h582-2pch-3xv3 |
+| MEDIUM | django | 1.4 | GHSA-hmr4-m2h5-33qx |
+| MEDIUM | django | 1.4 | GHSA-jhjg-w2cp-5j44 |
+| MEDIUM | django | 1.4 | GHSA-pgxh-wfw4-jx2v |
+| MEDIUM | django | 1.4 | GHSA-pw27-w7w4-9qc7 |
+| MEDIUM | django | 1.4 | GHSA-q5qw-4364-5hhm |
+| MEDIUM | django | 1.4 | GHSA-q7q2-qf2q-rw3w |
+| MEDIUM | django | 1.4 | GHSA-qrh7-x6fp-c2mp |
+| MEDIUM | django | 1.4 | GHSA-qw25-v68c-qjf3 |
+| MEDIUM | django | 1.4 | GHSA-r7w6-p47g-vj53 |
+| MEDIUM | django | 1.4 | GHSA-rrqc-c2jx-6jgv |
+| MEDIUM | django | 1.4 | GHSA-rvq6-mrpv-m6rm |
+| MEDIUM | django | 1.4 | GHSA-rw75-m7gp-92m3 |
+| MEDIUM | django | 1.4 | GHSA-vfq6-hq5r-27r6 |
+| MEDIUM | django | 1.4 | GHSA-vjjp-9r83-22rc |
+| MEDIUM | django | 1.4 | GHSA-vq3h-3q7v-9prw |
+| MEDIUM | django | 1.4 | GHSA-wqjj-hx84-v449 |
+| MEDIUM | django | 1.4 | GHSA-x38m-486c-2wr9 |
+| MEDIUM | django | 1.4 | GHSA-x64m-686f-fmm3 |
+| MEDIUM | django | 1.4 | PYSEC-2012-2 |
+| MEDIUM | django | 1.4 | PYSEC-2012-3 |
+| MEDIUM | django | 1.4 | PYSEC-2012-4 |
+| MEDIUM | django | 1.4 | PYSEC-2012-7 |
+| MEDIUM | django | 1.4 | PYSEC-2013-16 |
+| MEDIUM | django | 1.4 | PYSEC-2013-17 |
+| MEDIUM | django | 1.4 | PYSEC-2013-18 |
+| MEDIUM | django | 1.4 | PYSEC-2013-19 |
+| MEDIUM | django | 1.4 | PYSEC-2013-20 |
+| MEDIUM | django | 1.4 | PYSEC-2013-21 |
+| MEDIUM | django | 1.4 | PYSEC-2014-1 |
+| MEDIUM | django | 1.4 | PYSEC-2014-19 |
+| MEDIUM | django | 1.4 | PYSEC-2014-2 |
+| MEDIUM | django | 1.4 | PYSEC-2014-20 |
+| MEDIUM | django | 1.4 | PYSEC-2014-3 |
+| MEDIUM | django | 1.4 | PYSEC-2014-4 |
+| MEDIUM | django | 1.4 | PYSEC-2014-5 |
+| MEDIUM | django | 1.4 | PYSEC-2014-6 |
+| MEDIUM | django | 1.4 | PYSEC-2014-7 |
+| MEDIUM | django | 1.4 | PYSEC-2015-10 |
+| MEDIUM | django | 1.4 | PYSEC-2015-11 |
+| MEDIUM | django | 1.4 | PYSEC-2015-20 |
+| MEDIUM | django | 1.4 | PYSEC-2015-22 |
+| MEDIUM | django | 1.4 | PYSEC-2015-23 |
+| MEDIUM | django | 1.4 | PYSEC-2015-4 |
+| MEDIUM | django | 1.4 | PYSEC-2015-5 |
+| MEDIUM | django | 1.4 | PYSEC-2015-6 |
+| MEDIUM | django | 1.4 | PYSEC-2015-7 |
+| MEDIUM | django | 1.4 | PYSEC-2015-8 |
+| MEDIUM | django | 1.4 | PYSEC-2015-9 |
+| MEDIUM | django | 1.4 | PYSEC-2016-15 |
+| MEDIUM | django | 1.4 | PYSEC-2016-16 |
+| MEDIUM | django | 1.4 | PYSEC-2016-18 |
+| MEDIUM | django | 1.4 | PYSEC-2016-2 |
+| MEDIUM | django | 1.4 | PYSEC-2016-3 |
+| MEDIUM | django | 1.4 | PYSEC-2019-16 |
+| MEDIUM | django | 1.4 | PYSEC-2021-98 |
+| MEDIUM | django | 1.4 | PYSEC-2022-304 |
+| MEDIUM | django | 1.4 | PYSEC-2026-1297 |
+| MEDIUM | django | 1.4 | PYSEC-2026-801 |
+| MEDIUM | django | 1.4 | PYSEC-2026-802 |
+| MEDIUM | flask | 2.3.2 | GHSA-68rp-wp8r-4726 |
+| MEDIUM | flask | 2.3.2 | PYSEC-2026-2151 |
+
+## Secrets in Git History
+| Severity | Commit | File | Kind |
+|---|---|---|---|
+| CRITICAL | `b7288da96bfd` | `tests/test_cli.py` | aws_access_key |
+| CRITICAL | `b7288da96bfd` | `tests/test_secrets.py` | aws_access_key |
+| CRITICAL | `b7288da96bfd` | `tests/test_secrets.py` | aws_access_key |
+| CRITICAL | `b7288da96bfd` | `tests/test_secrets.py` | aws_access_key |
+| CRITICAL | `b14d9f41afa6` | `tests/test_cli.py` | aws_access_key |
+| CRITICAL | `fd60b7d44393` | `tests/test_cli.py` | aws_access_key |
+| CRITICAL | `fd60b7d44393` | `tests/test_cli.py` | aws_access_key |
+| CRITICAL | `fd60b7d44393` | `tests/test_cli.py` | aws_access_key |
+| CRITICAL | `fd60b7d44393` | `tests/test_secrets.py` | aws_access_key |
+| CRITICAL | `fd60b7d44393` | `tests/test_secrets.py` | aws_access_key |
+| CRITICAL | `fd60b7d44393` | `tests/test_secrets.py` | aws_access_key |
+| CRITICAL | `648ff7704f1b` | `tests/fixtures/ignore-test/ignored_secret.py` | aws_access_key |
+| CRITICAL | `648ff7704f1b` | `tests/fixtures/ignore-test/inline_ignore.py` | aws_access_key |
+| CRITICAL | `648ff7704f1b` | `tests/fixtures/planted_secrets.py` | stripe_live_key |
+| CRITICAL | `648ff7704f1b` | `tests/fixtures/planted_secrets.py` | db_connection_string_with_creds |
+| CRITICAL | `648ff7704f1b` | `tests/test_history.py` | aws_access_key |
+| CRITICAL | `55cfd5f162e2` | `tests/fixtures/planted_secrets.py` | aws_access_key |
+| CRITICAL | `55cfd5f162e2` | `tests/fixtures/planted_secrets.py` | github_token |
+| CRITICAL | `55cfd5f162e2` | `tests/fixtures/planted_secrets.py` | private_key_header |
+| HIGH | `648ff7704f1b` | `tests/fixtures/planted_secrets.py` | jwt_token |
+| MEDIUM | `070fd13d164e` | `tests/test_secrets.py` | generic_secret_assignment |
+| MEDIUM | `070fd13d164e` | `tests/test_secrets.py` | generic_secret_assignment |
+| MEDIUM | `fd60b7d44393` | `tests/test_secrets.py` | generic_secret_assignment |
+| MEDIUM | `55cfd5f162e2` | `tests/fixtures/planted_secrets.py` | generic_secret_assignment |
+| MEDIUM | `55cfd5f162e2` | `tests/fixtures/planted_secrets.py` | generic_secret_assignment |

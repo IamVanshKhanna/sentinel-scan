@@ -19,8 +19,10 @@ FAKE_PRIVATE_KEY = """-----BEGIN RSA PRIVATE KEY-----
 FAKEKEYDATAFAKEKEYDATAFAKEKEYDATAFAKEKEYDATA
 -----END RSA PRIVATE KEY-----"""
 
-# fake Stripe live key (correct format, not live)
-STRIPE_KEY = "sk_live_FAKEFAKEFAKEFAKEFAKEFAKE"
+# fake Stripe live key (correct shape/length, not live — monotonous repeated
+# character so it lacks the entropy of a real key and doesn't trip GitHub's
+# own secret-scanning push protection on this repo)
+STRIPE_KEY = "sk_live_00000000000000000000"
 
 # fake JWT (correct structural shape, not a real signed token)
 JWT = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJmYWtlIn0.fake_signature_not_real"

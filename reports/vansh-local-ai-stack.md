@@ -1,4 +1,4 @@
-# sentinel-scan report — `vansh-local-ai-stack`
+# sentinel-scan report - `vansh-local-ai-stack`
 
 **Triage summary:** Genuinely clean across the board.
 

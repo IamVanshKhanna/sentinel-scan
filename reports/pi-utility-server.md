@@ -1,6 +1,6 @@
-# sentinel-scan report — `pi-utility-server`
+# sentinel-scan report - `pi-utility-server`
 
-**Triage summary:** Current tree is clean. Git history shows 3 real `.key` files (self-signed local Traefik TLS certs — not internet-exposed production secrets) committed once in an early restructuring commit, later removed — a genuine catch, not a false positive; verified via byte size and absence of placeholder markers. The 30 MEDIUM findings share a single already-deleted commit (`7915a20de760`, the original K3s/ArgoCD/Helmfile experiment, fully removed the very next commit per its own message "clean: remove v2.x artifacts") — the repeated identical value-lengths suggest templated/placeholder Helm values rather than distinct real secrets, but individual values weren't manually verified beyond checking against a common-placeholder denylist.
+**Triage summary:** Current tree is clean. Git history shows 3 real `.key` files (self-signed local Traefik TLS certs — not internet-exposed production secrets) committed once in an early restructuring commit, later removed — a genuine catch, verified via byte size and absence of placeholder markers. The 30 MEDIUM findings share a single already-deleted commit (`7915a20de760`, the original K3s/ArgoCD/Helmfile experiment, fully removed the very next commit per its own message "clean: remove v2.x artifacts") — repeated identical value-lengths suggest templated/placeholder Helm values rather than distinct real secrets, but individual values weren't manually decoded beyond checking against a common-placeholder denylist.
 
 **Risk score:** 153
 

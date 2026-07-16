@@ -1,8 +1,8 @@
-# sentinel-scan report — `sentinel-scan`
+# sentinel-scan report - `sentinel-scan`
 
-**Triage summary:** Highest score, and 100% expected — this is the tool scanning its own test fixtures, which deliberately contain planted fake secrets (correct format, not live credentials — documented in `tests/fixtures/` and the README) to prove each detector actually fires. Every single finding here is either a fixture or the tool correctly flagging its own README/CHANGELOG for *mentioning* things like "AKIA..." as prose. Included in this batch for completeness — a "0 findings" report on the scanner's own repo would actually be a red flag (it would mean the fixture-based tests aren't testing what they claim to).
+**Triage summary:** Expected — this is the tool scanning its own test fixtures, which deliberately contain planted fake secrets (correct format, not live credentials — documented in `tests/fixtures/` and the README) to prove each detector fires correctly. Score is higher than earlier scans in this project (747 vs 677) because the fixture set grew as more detectors and edge-case tests were added during the false-positive fixing work. A "0 findings" result here would be the actual red flag — it would mean the fixture-based test suite isn't testing what it claims to.
 
-**Risk score:** 677
+**Risk score:** 747
 
 ## Secrets
 | Severity | File | Line | Kind |
@@ -11,6 +11,8 @@
 | CRITICAL | `sentinel-scan/tests/test_secrets.py` | 122 | aws_access_key |
 | CRITICAL | `sentinel-scan/tests/test_secrets.py` | 153 | aws_access_key |
 | CRITICAL | `sentinel-scan/tests/test_secrets.py` | 173 | aws_access_key |
+| CRITICAL | `sentinel-scan/tests/test_secrets.py` | 182 | db_connection_string_with_creds |
+| CRITICAL | `sentinel-scan/tests/test_secrets.py` | 209 | private_key_header |
 | CRITICAL | `sentinel-scan/tests/test_history.py` | 19 | aws_access_key |
 | CRITICAL | `sentinel-scan/tests/test_cli.py` | 15 | aws_access_key |
 | CRITICAL | `sentinel-scan/tests/test_cli.py` | 25 | aws_access_key |
@@ -23,6 +25,7 @@
 | CRITICAL | `sentinel-scan/tests/fixtures/planted_secrets.py` | 29 | db_connection_string_with_creds |
 | CRITICAL | `sentinel-scan/tests/fixtures/fake.pem` | 0 | pem_key_file |
 | CRITICAL | `sentinel-scan/tests/fixtures/ignore-test/ignored_secret.py` | 2 | aws_access_key |
+| CRITICAL | `sentinel-scan/sentinel_scan/secrets.py` | 186 | private_key_header |
 | HIGH | `sentinel-scan/tests/fixtures/planted_secrets.py` | 26 | jwt_token |
 | MEDIUM | `sentinel-scan/tests/test_secrets.py` | 130 | generic_secret_assignment |
 | MEDIUM | `sentinel-scan/tests/test_secrets.py` | 143 | generic_secret_assignment |
@@ -132,6 +135,10 @@
 ## Secrets in Git History
 | Severity | Commit | File | Kind |
 |---|---|---|---|
+| CRITICAL | `002a37730029` | `sentinel_scan/secrets.py` | private_key_header |
+| CRITICAL | `002a37730029` | `tests/test_secrets.py` | db_connection_string_with_creds |
+| CRITICAL | `002a37730029` | `tests/test_secrets.py` | private_key_header |
+| CRITICAL | `002a37730029` | `tests/test_secrets.py` | private_key_header |
 | CRITICAL | `b7288da96bfd` | `tests/test_cli.py` | aws_access_key |
 | CRITICAL | `b7288da96bfd` | `tests/test_secrets.py` | aws_access_key |
 | CRITICAL | `b7288da96bfd` | `tests/test_secrets.py` | aws_access_key |

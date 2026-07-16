@@ -5,12 +5,14 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![CI](https://github.com/IamVanshKhanna/sentinel-scan/actions/workflows/ci.yml/badge.svg)](https://github.com/IamVanshKhanna/sentinel-scan/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
+[![Platforms](https://img.shields.io/badge/tested%20on-macOS%20%7C%20Linux%20%7C%20Windows-success)](#tested-on)
 
 ---
 
 ## Table of Contents
 
 - [What It Does](#what-it-does)
+- [Tested On](#tested-on)
 - [How It Works](#how-it-works)
 - [Quick Start](#quick-start)
 - [Usage](#usage)
@@ -31,6 +33,20 @@
 3. **Scored report** — every finding gets a severity (critical/high/medium/low); a total risk score is computed from the weighted sum.
 
 Built to understand the technique, not to replace gitleaks or truffleHog — those are maintained, team-backed tools with curated ruleset libraries and (in truffleHog's case) live credential verification this doesn't attempt. This is a small, from-scratch implementation of the same core idea (regex + entropy detection, dependency CVE lookup) applied to my own repos before they went public, kept intentionally readable end to end.
+
+---
+
+## Tested On
+
+Not a "should work everywhere, Python is Python" claim — a fresh clone → venv → install → run was actually done on each platform, including forcing a real network failure to confirm the tool fails visibly rather than silently:
+
+| Platform | How it was verified |
+|---|---|
+| **macOS** | Native venv, fresh clone, full test suite + a real unreachable-host network-failure test |
+| **Linux** | Docker (`python:3.12-slim`), built and run against a real external repo; CI (GitHub Actions, `ubuntu-latest`) runs the full suite on every push |
+| **Windows** | Fresh SSH session to a real Windows machine (Python 3.14, git 2.54) — clone, venv, install, all 50 tests passing, `--fail-on` exit code verified via PowerShell, network-failure behavior confirmed |
+
+Two real bugs were found doing this, not hypothesized: em-dashes in console output rendered as `?` on Windows' default (non-UTF-8) console codepage, and a Rich table's default truncation style caused the same mangling on long file paths. Both fixed and re-verified on the actual Windows machine before being called done — see [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
@@ -165,8 +181,11 @@ sentinel-scan/
 |   +-- report.py        # table / JSON / markdown rendering
 +-- tests/
 |   +-- fixtures/        # planted fake secrets + sample manifests
++-- reports/             # real scan reports run against other repos in this account
 +-- .github/workflows/   # CI: ruff + pytest on every push
 ```
+
+See [`reports/`](reports/) for real output — this tool run against 4 other real repos, findings triaged by hand, not raw output dumped uncritically.
 
 ---
 

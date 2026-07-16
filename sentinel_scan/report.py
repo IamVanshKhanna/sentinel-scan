@@ -20,7 +20,7 @@ except ImportError:
 
 def _deps_status_line(vuln_findings: list, deps_check_ok: bool) -> str:
     if not deps_check_ok:
-        return "dependency check FAILED — results incomplete, not verified clean"
+        return "dependency check FAILED - results incomplete, not verified clean"
     return f"{len(vuln_findings)} vulnerable dependencies"
 
 
@@ -32,13 +32,13 @@ def render_table(secret_findings: list, vuln_findings: list, target: str,
 
     if _HAS_RICH:
         console = Console()
-        console.print(f"\n[bold]sentinel-scan[/bold] — [dim]{target}[/dim]")
+        console.print(f"\n[bold]sentinel-scan[/bold] - [dim]{target}[/dim]")
         console.print(f"Risk score: [bold]{score}[/bold]  "
                        f"({len(secret_findings)} secret findings, {deps_status}, "
                        f"{len(history_findings)} in git history)\n")
         if not deps_check_ok:
             console.print("[bold yellow]WARNING:[/bold yellow] dependency vulnerability check "
-                           "failed — do not treat this as a clean result.\n")
+                           "failed - do not treat this as a clean result.\n")
 
         if secret_findings:
             table = Table(title="Secrets")
@@ -76,17 +76,17 @@ def render_table(secret_findings: list, vuln_findings: list, target: str,
         if not secret_findings and not vuln_findings and not history_findings and deps_check_ok:
             console.print("[green]No findings.[/green]")
     else:
-        print(f"sentinel-scan — {target}")
+        print(f"sentinel-scan - {target}")
         print(f"Risk score: {score} ({len(secret_findings)} secrets, {deps_status}, "
               f"{len(history_findings)} in history)")
         if not deps_check_ok:
-            print("WARNING: dependency vulnerability check failed — results incomplete.")
+            print("WARNING: dependency vulnerability check failed - results incomplete.")
         for f in sorted(secret_findings, key=lambda x: severity_rank(x.severity)):
-            print(f"  [{f.severity.upper()}] {f.file}:{f.line} {f.kind} — {f.snippet}")
+            print(f"  [{f.severity.upper()}] {f.file}:{f.line} {f.kind} - {f.snippet}")
         for v in sorted(vuln_findings, key=lambda x: severity_rank(x.severity)):
-            print(f"  [{v.severity.upper()}] {v.package}=={v.version} {v.vuln_id} — {v.summary}")
+            print(f"  [{v.severity.upper()}] {v.package}=={v.version} {v.vuln_id} - {v.summary}")
         for h in sorted(history_findings, key=lambda x: severity_rank(x.severity)):
-            print(f"  [{h.severity.upper()}] {h.commit} {h.file} {h.kind} — {h.snippet}")
+            print(f"  [{h.severity.upper()}] {h.commit} {h.file} {h.kind} - {h.snippet}")
 
 
 def render_json(secret_findings: list, vuln_findings: list, target: str,
@@ -107,7 +107,7 @@ def render_markdown(secret_findings: list, vuln_findings: list, target: str,
                      history_findings: list | None = None, deps_check_ok: bool = True) -> str:
     history_findings = history_findings or []
     score = risk_score(secret_findings, vuln_findings, history_findings)
-    lines = [f"# sentinel-scan report — `{target}`", "", f"**Risk score:** {score}", ""]
+    lines = [f"# sentinel-scan report - `{target}`", "", f"**Risk score:** {score}", ""]
 
     lines.append("## Secrets")
     if secret_findings:
@@ -121,7 +121,7 @@ def render_markdown(secret_findings: list, vuln_findings: list, target: str,
     lines.append("")
     lines.append("## Vulnerable Dependencies")
     if not deps_check_ok:
-        lines.append("**Check FAILED — results incomplete, not verified clean.**")
+        lines.append("**Check FAILED - results incomplete, not verified clean.**")
     elif vuln_findings:
         lines.append("| Severity | Package | Version | Vuln ID |")
         lines.append("|---|---|---|---|")

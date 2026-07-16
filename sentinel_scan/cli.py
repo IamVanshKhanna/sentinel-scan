@@ -63,10 +63,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"{secret_scan.inline_suppressed_count} line(s) suppressed by inline "
               f"'sentinel-scan:ignore' markers.", file=sys.stderr)
     if not deps_check_ok:
-        print("WARNING: dependency vulnerability check failed (network/API error) — "
+        print("WARNING: dependency vulnerability check failed (network/API error) - "
               "results are INCOMPLETE, not verified clean.", file=sys.stderr)
     if args.history and not history_check_ok:
-        print("WARNING: git history scan failed (git command error/timeout) — "
+        print("WARNING: git history scan failed (git command error/timeout) - "
               "history results are INCOMPLETE, not verified clean.", file=sys.stderr)
 
     if args.fail_on != "none":

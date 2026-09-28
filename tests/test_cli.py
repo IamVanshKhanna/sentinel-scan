@@ -82,3 +82,27 @@ def test_json_output_includes_schema_version(tmp_path, capsys):
     main([str(tmp_path), "--no-deps", "--json"])
     out = capsys.readouterr().out
     assert '"schema_version": 1' in out
+
+
+def test_missing_target_rejected(tmp_path):
+    with pytest.raises(SystemExit) as exc_info:
+        main([str(tmp_path / "missing"), "--no-deps"])
+    assert exc_info.value.code == 2
+
+
+def test_failed_dependency_check_returns_incomplete_status(tmp_path, capsys, monkeypatch):
+    from sentinel_scan import cli, deps
+
+    (tmp_path / "requirements.txt").write_text("requests==2.6.0\n")
+    monkeypatch.setattr(cli.deps, "query_osv", lambda found: deps.OsvQueryResult([], False))
+    code = main([str(tmp_path), "--json", "--fail-on", "high"])
+    assert code == 2
+    captured = capsys.readouterr()
+    assert '"dependency_check_ok": false' in captured.out
+    assert "INCOMPLETE" in captured.err
+
+
+def test_invalid_max_commits_rejected(tmp_path):
+    with pytest.raises(SystemExit) as exc_info:
+        main([str(tmp_path), "--no-deps", "--max-commits", "0"])
+    assert exc_info.value.code == 2

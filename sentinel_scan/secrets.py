@@ -52,8 +52,8 @@ PATTERNS: list[tuple[str, str, str]] = [
     # var in the password slot, and without this exclusion every such file gets flagged
     # "critical" for a credential that was never actually hardcoded.
     ("db_connection_string_with_creds",
-     r"(?i)(postgres|postgresql|mysql|mongodb(\+srv)?)://[^:\s]+:"
-     r"(?!(?:\*+|x+|password|passwd|test\w*|changeme|example|secret|admin)@)(?!\$)[^@\s]+@[^/\s]+",
+     (r"(?i)(postgres|postgresql|mysql|mongodb(\+srv)?)://[^:\s]+:"
+      r"(?!(?:\*+|x+|password|passwd|test\w*|changeme|example|secret|admin)@)(?!\$)[^@\s]+@[^/\s]+"),
      "critical"),
     # Excludes values starting with $ or {{ — those are variable references / template
     # placeholders (${VAR}, $VAR, {{ jinja }}), not literal hardcoded secrets.

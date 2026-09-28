@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 
 from . import __version__, deps, history, report, secrets
@@ -30,6 +31,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--fail-on", choices=["critical", "high", "medium", "low", "none"],
                          default="none", help="Exit non-zero if a finding at or above this severity exists")
     args = parser.parse_args(argv)
+    if not os.path.isdir(args.path):
+        parser.error(f"not a directory: {args.path}")
+    if args.max_commits < 1:
+        parser.error("--max-commits must be at least 1")
 
     secret_scan = secrets.scan_directory_with_stats(args.path, extra_ignore_patterns=args.exclude)
     secret_findings = secret_scan.findings
@@ -79,6 +84,8 @@ def main(argv: list[str] | None = None) -> int:
         if any(severity_rank(s) <= threshold for s in all_severities):
             return 1
 
+    if not deps_check_ok or not history_check_ok:
+        return 2  # scan incomplete, not a verified clean result
     return 0
 
 

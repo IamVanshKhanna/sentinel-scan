@@ -15,6 +15,7 @@
 - [Tested On](#tested-on)
 - [How It Works](#how-it-works)
 - [Quick Start](#quick-start)
+- [Five-minute demo](#five-minute-demo)
 - [Usage](#usage)
 - [What to Expect](#what-to-expect)
 - [Pros and Cons](#pros-and-cons)
@@ -73,6 +74,22 @@ pip install -e ".[dev]"
 
 sentinel-scan .
 ```
+
+## Five-minute demo
+
+The [`demo/`](demo/README.md) walkthrough is a safe local target: fake key-like
+text, an old sample dependency, offline detection, JSON/Markdown output, and a
+non-zero CI gate. No real secret or third-party repository is needed. Start with:
+
+```bash
+sentinel-scan demo --no-deps --json
+sentinel-scan demo --no-deps --fail-on medium
+```
+
+The second command exits 1 because the deliberately fake key-like value is
+found. See [the full demo](demo/README.md) for the optional live OSV lookup
+and expected output fields. Exit 2 means the dependency/history check failed
+or the command-line arguments were invalid - not that a scan found no issues.
 
 ## Usage
 

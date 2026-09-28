@@ -108,7 +108,16 @@ def query_osv(deps: list[Dependency], timeout: float | None = None) -> OsvQueryR
     try:
         resp = requests.post(OSV_BATCH_URL, json={"queries": queries}, timeout=effective_timeout)
         resp.raise_for_status()
-        results = resp.json().get("results", [])
+        payload = resp.json()
+        if not isinstance(payload, dict):
+            return OsvQueryResult(findings=[], ok=False)
+        results = payload.get("results")
+        # A partial or malformed batch cannot establish that unchecked packages are clean.
+        if (not isinstance(results, list) or len(results) != len(deps)
+                or any(not isinstance(item, dict) or not isinstance(item.get("vulns", []), list)
+                       or any(not isinstance(v, dict) for v in item.get("vulns", []))
+                       for item in results)):
+            return OsvQueryResult(findings=[], ok=False)
     except (requests.RequestException, ValueError):
         return OsvQueryResult(findings=[], ok=False)
 

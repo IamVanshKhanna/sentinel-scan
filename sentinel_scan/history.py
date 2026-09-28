@@ -38,7 +38,7 @@ class HistoryScanResult:
 def is_git_repo(path: str) -> bool:
     result = subprocess.run(
         ["git", "-C", path, "rev-parse", "--is-inside-work-tree"],
-        capture_output=True, text=True, timeout=10,
+        capture_output=True, text=True, timeout=10, check=False,
     )
     return result.returncode == 0 and result.stdout.strip() == "true"
 
@@ -57,7 +57,7 @@ def scan_history(path: str, max_commits: int = 500) -> HistoryScanResult:
     try:
         result = subprocess.run(
             ["git", "-C", path, "log", "-p", f"-{max_commits}", "--no-color", "--unified=0"],
-            capture_output=True, text=True, timeout=60,
+            capture_output=True, text=True, timeout=60, check=False,
         )
     except (subprocess.TimeoutExpired, OSError):
         return HistoryScanResult(findings=[], ok=False)

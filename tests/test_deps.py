@@ -86,3 +86,21 @@ def test_compute_timeout_scales_up_for_large_batches():
     the effective timeout must grow with how many packages are being queried."""
     assert compute_timeout(200) == 50.0
     assert compute_timeout(1000) > compute_timeout(200)
+
+@responses.activate
+def test_query_osv_rejects_incomplete_batch():
+    deps = [Dependency(name=n, version="1.0", ecosystem="PyPI", manifest="requirements.txt")
+            for n in ("first", "second")]
+    responses.add(responses.POST, "https://api.osv.dev/v1/querybatch",
+                  json={"results": [{"vulns": []}]}, status=200)
+    result = query_osv(deps)
+    assert result.ok is False
+    assert result.findings == []
+
+
+@responses.activate
+def test_query_osv_rejects_malformed_success_response():
+    dep = Dependency(name="first", version="1.0", ecosystem="PyPI", manifest="requirements.txt")
+    responses.add(responses.POST, "https://api.osv.dev/v1/querybatch",
+                  json={"results": [{"vulns": "not a list"}]}, status=200)
+    assert query_osv([dep]).ok is False

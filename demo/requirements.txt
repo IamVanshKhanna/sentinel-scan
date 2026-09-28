@@ -1,0 +1,2 @@
+# Old sample package version for a live OSV lookup, not for installation.
+requests==2.6.0
